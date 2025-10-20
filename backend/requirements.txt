@@ -4,14 +4,12 @@ python-dotenv==1.0.0
 redis==5.0.1
 supabase==2.4.2
 pydantic==2.5.0
-torch==2.1.0
-torchaudio==2.1.0
-transformers==4.35.0
+torch
+torchaudio
+transformers
 pydub==0.25.1
 soundfile==0.12.1
-numpy==1.24.3
-# performance + optional quant
-bitsandbytes==0.43.3 ; platform_system == "Linux"
-accelerate==1.0.1
-# voice cloning dependencies
-speechbrain==0.5.14
+numpy
+accelerate
+speechbrain
+huggingface-hub
