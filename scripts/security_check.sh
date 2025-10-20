@@ -3,35 +3,41 @@
 # Security Check Script - Pre-push validation
 # Prevents secrets and large files from being committed
 
-set -e
-
 echo "🔐 Running security check..."
 
 # Check for secrets in staged files
 SECRETS_FOUND=0
 
-# Check for common secret patterns
-PATTERNS=(
-    "ghp_[A-Za-z0-9_]{36}"
-    "gho_[A-Za-z0-9_]{36}"
-    "ghu_[A-Za-z0-9_]{36}"
-    "ghs_[A-Za-z0-9_]{36}"
-    "ghr_[A-Za-z0-9_]{36}"
-    "SUPABASE.*KEY"
-    "REDIS.*URL"
-    "HF_TOKEN"
-    "API_KEY"
-    "SECRET_KEY"
-    "PRIVATE_KEY"
-    "-----BEGIN.*PRIVATE KEY-----"
-)
+# Get list of staged files (excluding security check script)
+STAGED_FILES=$(git diff --cached --name-only | grep -v "scripts/security_check.sh")
 
-for pattern in "${PATTERNS[@]}"; do
-    if git diff --cached --name-only | xargs grep -l -E "$pattern" 2>/dev/null; then
-        echo "❌ SECRET DETECTED: Pattern '$pattern' found in staged files"
-        SECRETS_FOUND=1
-    fi
-done
+# If no staged files, skip secret check
+if [ -z "$STAGED_FILES" ]; then
+    echo "✅ No staged files to check"
+else
+    # Check for common secret patterns
+    PATTERNS=(
+        "ghp_[A-Za-z0-9_]{36}"
+        "gho_[A-Za-z0-9_]{36}"
+        "ghu_[A-Za-z0-9_]{36}"
+        "ghs_[A-Za-z0-9_]{36}"
+        "ghr_[A-Za-z0-9_]{36}"
+        "SUPABASE.*KEY"
+        "REDIS.*URL"
+        "HF_TOKEN"
+        "API_KEY"
+        "SECRET_KEY"
+        "PRIVATE_KEY"
+        "-----BEGIN.*PRIVATE KEY-----"
+    )
+
+    for pattern in "${PATTERNS[@]}"; do
+        if echo "$STAGED_FILES" | xargs grep -l -E "$pattern" 2>/dev/null; then
+            echo "❌ SECRET DETECTED: Pattern '$pattern' found in staged files"
+            SECRETS_FOUND=1
+        fi
+    done
+fi
 
 # Check for large files (>50MB)
 LARGE_FILES=$(git diff --cached --name-only | xargs ls -la 2>/dev/null | awk '$5 > 52428800 {print $9 " (" $5 " bytes)"}')
