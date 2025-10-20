@@ -1,266 +1,123 @@
-# ODIADEV-TTS On-Call Cheatsheet
+# 🚨 ON-CALL CHEATSHEET - Dia AI TTS
 
-**Version:** v1.2-prod-ready  
-**Last Updated:** 2025-10-19  
-**Author:** CROSSO Engineering Team
+## Emergency Contacts
+- **Primary**: odiadev (GitHub: @odiadev)
+- **Secondary**: [Add trusted engineer]
+- **Escalation**: [Add senior engineer/CTO]
 
-## 🚨 EMERGENCY RESPONSE
+## 🚨 Emergency Rollback Procedures
 
-### 🔥 OOM (Out of Memory)
-**Symptoms:** 500 errors, GPU 100% for >10s, nvidia-smi >15.5GB
-
+### 1. Disable Free Lane (High Load)
 ```bash
-# 1. Kill free lane first
-pkill -f "uvicorn.*8001"
+# Stop free lane container
+docker stop tts_free
 
-# 2. Check if priority lane recovers
-curl -s http://localhost:8000/health
+# Re-route all traffic to priority
+docker exec -it gateway ./switch_lane priority
 
-# 3. If still OOM, disable voice cloning
-export DISABLE_VOICE_CLONING=1
+# Verify routing
+curl -H "X-API-Key: priority_key" http://gateway/whoami
+```
 
-# 4. Flip to 8-bit quantization
+### 2. GPU Memory Issues
+```bash
+# Enable BNB optimization
 export DIA_USE_BNB=1
-# Restart both lanes
+docker restart tts_priority
 
-# 5. If still failing, scale to A10G via RunPod dashboard
+# Check GPU usage
+nvidia-smi
 ```
 
-### 🐌 Latency Spike
-**Symptoms:** p95 > 6s for 10+ min, queue > 10
-
+### 3. Complete System Failure
 ```bash
-# 1. Throttle free lane
-# Edit infra/env.free and reduce MAX_CONCURRENT to 1
+# Rollback to last stable version
+git checkout v1.1-clone-enabled
+docker compose down
+docker compose up -d
 
-# 2. Return 429s faster
-# Edit middleware/security.py and reduce rate limits
-
-# 3. Check GPU utilization
-watch -n 2 nvidia-smi
-
-# 4. If persists > 15min, scale to A10G
+# Verify health
+curl http://localhost:8000/health
 ```
 
-### 🗑️ Storage Surge
-**Symptoms:** Disk usage spiking, clone failures
+## 🔍 Quick Diagnostics
 
+### Check System Health
 ```bash
-# 1. Pause clone endpoint
-export DISABLE_VOICE_CLONING=1
+# API health
+curl http://localhost:8000/health
 
-# 2. Run cleanup for temp uploads >24h
-python scripts/lifecycle_policy.py
+# Queue status
+curl -H "X-API-Key: admin_key" http://localhost:8000/admin/queue-status
 
-# 3. Check storage usage
-df -h
+# GPU status
+nvidia-smi
 
-# 4. Notify team
+# Container status
+docker ps
 ```
 
-### 💧 Watermark Bug
-**Symptoms:** Reports of missing watermarks for free users
-
+### Check Logs
 ```bash
-# 1. Disable TTS for free lane
-# Temporarily stop free lane service
+# Priority lane logs
+docker logs tts_priority --tail 100
 
-# 2. Hotfix server-side check
-# Edit backend/app/middleware/security.py
-# Force watermark for LANE=free
+# Free lane logs
+docker logs tts_free --tail 100
 
-# 3. Re-enable after fix
+# Gateway logs
+docker logs gateway --tail 100
 ```
 
-## 📊 HEALTH CHECKS
+## 📊 Monitoring Alerts
 
-### 🔍 Lane Status
-```bash
-# Priority Lane
-curl -s http://localhost:8000/health | jq
-curl -s http://localhost:8000/metrics | jq
+### Critical Alerts (Immediate Action)
+- **p95 latency > 6s** (10 min sustained)
+- **5xx errors > 1%** (5 min sustained)
+- **GPU utilization > 90%** (5 min sustained)
+- **Cache hit rate < 25%** (15 min sustained)
 
-# Free Lane
-curl -s http://localhost:8001/health | jq
-curl -s http://localhost:8001/metrics | jq
+### Warning Alerts (Monitor)
+- **Queue depth > 50**
+- **Memory usage > 80%**
+- **Disk usage > 85%**
 
-# Check lane identification
-curl -s http://localhost:8000/whoami | jq  # Should return {"lane": "priority"}
-curl -s http://localhost:8001/whoami | jq  # Should return {"lane": "free"}
-```
+## 🔧 Common Fixes
 
-### 📈 Key Metrics
-```bash
-# Cache hit rate (target ≥ 40%)
-curl -s http://localhost:8000/metrics | jq '.cache_hit_rate'
+### High Latency
+1. Check GPU utilization
+2. Verify cache hit rate
+3. Check queue depth
+4. Restart containers if needed
 
-# Latency (p50 ≤ 3.5s, p95 < 6s)
-curl -s http://localhost:8000/metrics | jq '.average_latency'
+### Memory Issues
+1. Enable BNB: `DIA_USE_BNB=1`
+2. Restart containers
+3. Check for memory leaks
 
-# Error rate (target < 1%)
-curl -s http://localhost:8000/metrics | jq '.error_count'
+### Authentication Issues
+1. Verify API keys in environment
+2. Check Supabase connection
+3. Restart authentication service
 
-# GPU utilization (target < 90%)
-nvidia-smi --query-gpu=utilization.gpu --format=csv,noheader,nounits
-```
+## 🚫 What NOT to Do
+- ❌ Don't restart all containers at once
+- ❌ Don't change production configs without testing
+- ❌ Don't disable monitoring
+- ❌ Don't commit secrets to git
+- ❌ Don't run untested scripts on production
 
-### 🔧 Service Status
-```bash
-# Check if services are running
-ps aux | grep uvicorn
+## 📞 Escalation Path
+1. **Level 1**: Check logs, restart containers
+2. **Level 2**: Rollback to previous version
+3. **Level 3**: Contact senior engineer
+4. **Level 4**: Emergency maintenance window
 
-# Check Redis
-redis-cli ping  # Should return PONG
-
-# Check disk space
-df -h /
-
-# Check memory
-free -h
-```
-
-## 🔧 OPERATIONAL COMMANDS
-
-### 🔄 Restart Services
-```bash
-# Restart Priority Lane
-pkill -f "uvicorn.*8000"
-cd /workspace/backend
-nohup uvicorn app.main:app --host 0.0.0.0 --port 8000 --env-file /workspace/infra/env.priority &
-
-# Restart Free Lane
-pkill -f "uvicorn.*8001"
-cd /workspace/backend
-nohup uvicorn app.main:app --host 0.0.0.0 --port 8001 --env-file /workspace/infra/env.free &
-
-# Check logs
-tail -f /var/log/odia-tts-priority.log
-tail -f /var/log/odia-tts-free.log
-```
-
-### 🧹 Maintenance
-```bash
-# Force cache clear
-redis-cli -h localhost -p 6379 flushall
-
-# Run cleanup script
-python scripts/lifecycle_policy.py
-
-# Check for abandoned files
-find /tmp -name "*.wav" -mtime +1 -delete
-```
-
-### 📊 Monitoring
-```bash
-# Watch GPU
-watch -n 2 nvidia-smi
-
-# Watch system resources
-htop
-
-# Watch logs
-tail -f /var/log/odia-tts-*.log | grep -E "(ERROR|WARNING|CRITICAL)"
-```
-
-## 🚨 ALERT THRESHOLDS
-
-| Metric | Threshold | Action |
-|--------|-----------|--------|
-| **p95 latency** | > 6s for 10min | Throttle free lane, consider scaling |
-| **5xx errors** | > 1% for 5min | Investigate service health |
-| **GPU utilization** | > 90% for 5min | Scale to A10G or reduce load |
-| **Cache hit rate** | < 25% for 60min | Check cache key integrity |
-| **Queue depth** | > 10 for 5min | Return 429s, reduce concurrency |
-
-## 📞 CONTACT LIST
-
-### 🚨 Primary Response
-- **DevOps Engineer**: [Name] - +1-XXX-XXX-XXXX
-- **ML Engineer**: [Name] - +1-XXX-XXX-XXXX
-
-### 🔧 Support Channels
-- **Supabase**: https://app.supabase.com/support
-- **RunPod**: https://www.runpod.io/legal/support
-- **HuggingFace**: https://huggingface.co/support
-
-### 📧 Notification Emails
-- **Critical Alerts**: team@odia.dev
-- **Performance Issues**: ops@odia.dev
-- **Security Events**: security@odia.dev
-
-## 🔁 ROLLBACK PROCEDURES
-
-### 🔄 Full Rollback
-```bash
-# 1. Tag current state
-git tag rollback-$(date +%s) && git push origin rollback-$(date +%s)
-
-# 2. Switch to previous image
-# In RunPod: Change image to v1.1-clone-enabled
-
-# 3. Verify rollback
-curl -s http://localhost:8000/health | jq
-```
-
-### 🚫 Emergency Rollback
-```bash
-# 1. Disable voice cloning entirely
-export DISABLE_VOICE_CLONING=1
-
-# 2. Switch to v1.0 image
-# In RunPod: Change image to v1.0-aida-stable
-
-# 3. Purge queue and restart
-```
-
-## 📋 DAILY CHECKLIST
-
-### ☀️ Morning Check (9:00 AM)
-- [ ] Check lane health (`/health` endpoints)
-- [ ] Review error logs from last 24h
-- [ ] Verify GPU utilization < 80%
-- [ ] Check cache hit rate > 35%
-- [ ] Confirm storage usage < 80%
-
-### 🌙 Evening Check (6:00 PM)
-- [ ] Run cleanup script
-- [ ] Review performance metrics
-- [ ] Check for pending alerts
-- [ ] Prepare incident report if needed
-- [ ] Update this cheatsheet with lessons learned
-
-## 🛠️ TROUBLESHOOTING
-
-### ❓ Common Issues
-
-**Q: TTS requests timing out**
-A: Check GPU utilization, model loading logs, and Redis connectivity
-
-**Q: Cache misses are too high**
-A: Verify cache keys include all parameters, check Redis connectivity
-
-**Q: Watermark not appearing**
-A: Check LANE environment variable, verify plan detection logic
-
-**Q: Rate limiting not working**
-A: Check in-memory rate limit storage, verify API key extraction
-
-### 🔍 Debug Commands
-
-```bash
-# Check environment variables
-printenv | grep -E "(LANE|PORT|REDIS)"
-
-# Check model loading
-grep "DIA model loaded" /var/log/odia-tts-*.log
-
-# Check Redis connection
-redis-cli -h localhost -p 6379 ping
-
-# Check API key validation
-curl -s -H "X-API-Key: invalid-key" http://localhost:8000/health
-```
+## 🔐 Security Incidents
+- **Suspected breach**: Immediately rotate all tokens
+- **Secret leak**: Use `git filter-repo` to clean history
+- **Unauthorized access**: Disable affected API keys
 
 ---
-**Last Reviewed:** 2025-10-19  
-**Next Review Due:** 2025-11-19
+**Last Updated**: $(date)
+**Version**: 1.0
