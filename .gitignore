@@ -1,0 +1,119 @@
+# Secrets & Credentials
+.env
+.env.*
+!.env.example
+infra/.env*
+backend/.env*
+frontend/.env*
+*.key
+*.pem
+*.pt
+*.pth
+*.bin
+*.safetensors
+
+# Audio files (can contain personal data)
+*.mp3
+*.wav
+*.m4a
+*.aac
+*.flac
+*.ogg
+*.wma
+
+# Model files
+pretrained_*
+models/
+checkpoints/
+*.ckpt
+*.pkl
+*.joblib
+
+# Cache & temporary files
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.log
+cache/
+.cache/
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Build artifacts
+build/
+dist/
+*.egg-info/
+.next/
+out/
+.nuxt/
+.vuepress/dist
+
+# IDE & Editor files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Node modules
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Python virtual environments
+venv/
+env/
+ENV/
+env.bak/
+venv.bak/
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+
+# Docker
+.dockerignore
+
+# Temporary files
+*.tmp
+*.temp
+*.bak
+*.backup
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Security
+*.pem
+*.key
+*.crt
+*.csr
+*.p12
+*.pfx
+
+# Large data files
+*.zip
+*.tar.gz
+*.rar
+*.7z
