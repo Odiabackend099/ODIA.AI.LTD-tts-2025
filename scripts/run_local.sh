@@ -7,16 +7,18 @@ echo "Starting ODIADEV-TTS services..."
 
 # Start Redis in background
 echo "Starting Redis..."
+# Remove existing container if it exists
+docker rm -f odia-redis 2>/dev/null || true
 docker run -d --name odia-redis -p 6379:6379 redis:7-alpine
 
 # Install backend dependencies
 echo "Installing backend dependencies..."
 cd ../backend
-pip install -r requirements.txt
+pip3 install -r requirements.txt
 
 # Start backend
 echo "Starting backend..."
-python -m app.main &
+python3 -m app.main &
 BACKEND_PID=$!
 
 # Install frontend dependencies

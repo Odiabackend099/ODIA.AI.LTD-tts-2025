@@ -1,13 +1,17 @@
-fastapi==0.115.0
-uvicorn[standard]==0.30.6
-pydantic==2.9.2
-python-dotenv==1.0.1
-redis==5.0.8
-httpx==0.27.2
-supabase==2.6.0
-transformers==4.44.2
-torch==2.4.0+cu121
-torchaudio==2.4.0+cu121
-soundfile==0.12.1
+fastapi==0.104.1
+uvicorn[standard]==0.24.0
+python-dotenv==1.0.0
+redis==5.0.1
+supabase==2.4.2
+pydantic==2.5.0
+torch==2.1.0
+torchaudio==2.1.0
+transformers==4.35.0
 pydub==0.25.1
-numpy==1.26.4
+soundfile==0.12.1
+numpy==1.24.3
+# performance + optional quant
+bitsandbytes==0.43.3 ; platform_system == "Linux"
+accelerate==1.0.1
+# voice cloning dependencies
+speechbrain==0.5.14
